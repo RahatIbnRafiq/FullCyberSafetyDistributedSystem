@@ -1,5 +1,9 @@
 
 import sys
+from CyberSafetyPredictor.Predictor import CyberSafetyPredcitor as CyberSafetyPredictor
+
+
+cybersafety_predictor = CyberSafetyPredictor()
 
 
 """
@@ -7,13 +11,18 @@ variable to decide which system to run.
 0: round robin scheduler, everything in memory (default)
 1: scheduler, everything in memory
 """
+
 WHAT_SYSTEM_TO_RUN = 0
 DATABASE_NAME = "VineDatabase"
 POST_COLLECTION_NAME = "SampledASONAMPosts"
 
 list_of_posts_to_be_predicted = []
 
-def loadingCyberSafetyPredictor():
+
+
+def cyberSafetyPredictorWorks():
+    for post_to_be_predicted in list_of_posts_to_be_predicted:
+        post_to_be_predicted.priority =  cybersafety_predictor.startPrediction(post_to_be_predicted)
     return
 
 def loadingMediaSessions():
@@ -25,11 +34,11 @@ def loadingMediaSessions():
             list_of_posts_to_be_predicted.append(MediaSession(data["postId"],data["description"],data["likeCount"]))
         except Exception:
             continue
-    return list_of_posts_to_be_predicted
     
 def startRunningMaster():
     loadingMediaSessions()
-    print len(list_of_posts_to_be_predicted)
+    if WHAT_SYSTEM_TO_RUN == 1:
+        cyberSafetyPredictorWorks()
     return
         
 
@@ -56,6 +65,3 @@ if __name__ == "__main__":
                 WHAT_SYSTEM_TO_RUN = 1
             startRunningMaster()
     print "master is exiting ..."
-            
-else:
-    print "You can't run master as a module. Please run master.py help to check the usage of the master script."
