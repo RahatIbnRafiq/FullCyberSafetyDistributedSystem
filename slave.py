@@ -8,35 +8,12 @@ POST_COLLECTION_NAME = "SampledASONAMPosts"
 
 USERNAME = "test"
 PASSWORD = "test"
-IP_LOCALHOST = "192.168.0.12"
+IP_LOCALHOST = "128.138.244.39"
 STATUS_QUEUE = "status"
 
+N = 100
+
 list_of_monitoring_media_sessions = []
-
-
-"""credentials = pika.PlainCredentials('test', 'test')
-parameters = pika.ConnectionParameters('128.138.244.39', 5672, '/', credentials)
-
-connection = pika.BlockingConnection(parameters)
-channel = connection.channel()
-
-channel.queue_declare(queue='status')
-i = 10
-
-while i < 100:
-    message = str(i)+",queue1,1"
-    channel.basic_publish(exchange='',
-                      routing_key='status',
-                      body=message,
-                      properties=pika.BasicProperties(
-                         delivery_mode = 2,
-                      ))
-    print(" [x] Sent %r" % message)
-    i+=5
-    time.sleep(30)
-    
-
-connection.close()"""
 
 
 class CountCallback(object):
@@ -45,11 +22,10 @@ class CountCallback(object):
 
     def __call__(self, ch, method, properties, body):
         tokens = body.split(",")
-        print str(len(tokens))+" number of media sessions got by this slave"
-        self.count -= 1
-        if self.count < 0:
-            print "done consuming messages present in the queue"
-            ch.stop_consuming()
+        for token in tokens:
+            list_of_monitoring_media_sessions.append(token)
+        print str(len(tokens))+" number of media sessions got by this slave. Added them to the monitoring list"
+        ch.stop_consuming()
     
 def sendStatusToMaster(slaveid,queue):
     credentials = pika.PlainCredentials(USERNAME, PASSWORD)
@@ -58,8 +34,9 @@ def sendStatusToMaster(slaveid,queue):
     channel = connection.channel()
     channel.queue_declare(queue=STATUS_QUEUE)
     message = str(len(list_of_monitoring_media_sessions))+","+queue+","+slaveid
+    print "Sending status message to the master: "+message
     channel.basic_publish(exchange='',
-                      routing_key='status',
+                      routing_key=STATUS_QUEUE,
                       body=message,
                       properties=pika.BasicProperties(
                          delivery_mode = 2,
@@ -76,6 +53,10 @@ def getMediaSessionsFromQueue(queue):
     channel = connection.channel()
     
     media_session_queue = channel.queue_declare(queue=queue) 
+    if media_session_queue.method.message_count == 0:
+        print "slave:media session queue is empty. returning"
+        connection.close()
+        return
     callback = CountCallback(media_session_queue.method.message_count)
     channel.basic_consume(callback,
                           queue=queue,
@@ -85,9 +66,11 @@ def getMediaSessionsFromQueue(queue):
 
 def startRunningSlave(slaveid,queue):
     while True:
+        print "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
         sendStatusToMaster(slaveid,queue)
         getMediaSessionsFromQueue(queue)
-        time.sleep(20)
+        #print "slave is going to sleep for 5 seconds."
+        time.sleep(5)
         
     return  
 

@@ -22,15 +22,16 @@ POST_COLLECTION_NAME = "SampledASONAMPosts"
 
 USERNAME = "test"
 PASSWORD = "test"
-IP_LOCALHOST = "192.168.0.12"
+IP_LOCALHOST = "128.138.244.39"
 STATUS_QUEUE = "status"
 
 
 
 
 class CountCallback(object):
-    def __init__(self, count):
+    def __init__(self, count,connection):
         self.count = count
+        self.connection = connection
 
     def __call__(self, ch, method, properties, body):
         tokens = body.split(",")
@@ -42,6 +43,7 @@ class CountCallback(object):
         if self.count < 0:
             print "done consuming messages present in the queue"
             ch.stop_consuming()
+            self.connection.close()
 
 
 
@@ -76,18 +78,22 @@ def checkStatusQueue():
     channel = connection.channel()
     
     status_queue = channel.queue_declare(queue=STATUS_QUEUE) 
-    callback = CountCallback(status_queue.method.message_count)
+    if status_queue.method.message_count == 0:
+        print "no messages currently in the status queue."
+        connection.close()
+        return "no status"
+    callback = CountCallback(status_queue.method.message_count,connection)
     channel.basic_consume(callback,
                           queue=STATUS_QUEUE,
                           no_ack=True)
     
-    print(' [*] Waiting for messages. To exit press CTRL+C')
+    print(' waiting to get statuses from the slaves')
     channel.start_consuming()
     
 def selectQueueToSendMediaSessions():
     number_of_slaves = len(slave_status_dictionary)
     for i in range(1,number_of_slaves+1):
-        if slave_status_dictionary[i] < 90:
+        if int(slave_status_dictionary[i][0]) < 10000:
             return slave_status_dictionary[i][1]
     return None 
 
@@ -114,14 +120,24 @@ def startRunningMaster():
     if WHAT_SYSTEM_TO_RUN == 1:
         cyberSafetyPredictorWorks()
     while True:
-        time.sleep(60) # sleep for a minute and then check the status queue for current slave usage statuses 
+        print "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+        #time.sleep(60) # sleep for a minute and then check the status queue for current slave usage statuses 
         checkStatusQueue()
         queue_to_send_media_sessions = selectQueueToSendMediaSessions()
         if queue_to_send_media_sessions is None:
-            print "All slaves are operating at the maximum. Spawn out another slave please."
+            if len(slave_status_dictionary) == 0:
+                print "spawn out a slave.no slave is currently out there for work."
+            else:
+                print "All slaves are operating at the maximum. Spawn out another slave please."
+        elif queue_to_send_media_sessions == "no status":
+            print "status queue is empty"
         else:
+            print "master is now sending media sessions to queue: "+str(queue_to_send_media_sessions)
             sendMediaSessionsToSlaveQueue(queue_to_send_media_sessions)
-            
+        print "current status of the slaves: "
+        print slave_status_dictionary
+        #print "master is going to sleep for 5 seconds"
+        time.sleep(10)
     return
         
 
