@@ -23,6 +23,13 @@ def getDistinctUserFromPostCollection(databaseName, collectionName):
     collection = db[collectionName]
     return collection.distinct("userId")
 
+def findCommentsFromVineSlaveComments(databaseName,collectionName,postid,before_time,after_time):
+    db = client[databaseName]
+    collection = db[collectionName]
+    #return collection.find({ "seconds_passed_until_this_comment":{ "$gt": before_time} },{ "seconds_passed_until_this_comment":{ "$lte": after_time} })
+    return collection.find({"seconds_passed_until_this_comment": {"$gte": before_time, "$lt": after_time}})
+
+
 
 def insertDataInDatabase(databaseName,collectionName, data):
     db = client[databaseName]

@@ -3,6 +3,8 @@ import sys
 from CyberSafetyPredictor.Predictor import CyberSafetyPredcitor as CyberSafetyPredictor
 import pika
 import time
+import databaseCodes.mongoOperations as mo
+from Utility.mediaSession import MediaSession as MediaSession
 
 cybersafety_predictor = CyberSafetyPredictor()
 
@@ -24,6 +26,7 @@ USERNAME = "test"
 PASSWORD = "test"
 IP_LOCALHOST = "128.138.244.39"
 STATUS_QUEUE = "status"
+counter = 1
 
 
 
@@ -56,8 +59,6 @@ def cyberSafetyPredictorWorks():
     return
 
 def loadingMediaSessions():
-    import databaseCodes.mongoOperations as mo
-    from Utility.mediaSession import MediaSession as MediaSession
     postData = mo.findAllDataFromCollection(DATABASE_NAME, POST_COLLECTION_NAME)
     for data in postData:
         try:
@@ -93,7 +94,8 @@ def checkStatusQueue():
 def selectQueueToSendMediaSessions():
     number_of_slaves = len(slave_status_dictionary)
     for i in range(1,number_of_slaves+1):
-        if int(slave_status_dictionary[i][0]) < 10000:
+        if int(slave_status_dictionary[i][0]) < 500:
+            print str(slave_status_dictionary[i][0]) +" has been selected"
             return slave_status_dictionary[i][1]
     return None 
 
@@ -104,8 +106,9 @@ def sendMediaSessionsToSlaveQueue(queue_to_send_media_sessions):
     channel = connection.channel()
     channel.queue_declare(queue=queue_to_send_media_sessions)
     message = ""
+    global counter
     for post in list_of_posts_to_be_predicted:
-        message = message+str(post.postId)+","
+        message = message+str(post.postId+"-"+str(counter))+","
     channel.basic_publish(exchange='',
                       routing_key=queue_to_send_media_sessions,
                       body=message,
@@ -120,6 +123,7 @@ def startRunningMaster():
     if WHAT_SYSTEM_TO_RUN == 1:
         cyberSafetyPredictorWorks()
     while True:
+        global counter
         print "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
         #time.sleep(60) # sleep for a minute and then check the status queue for current slave usage statuses 
         checkStatusQueue()
@@ -134,9 +138,10 @@ def startRunningMaster():
         else:
             print "master is now sending media sessions to queue: "+str(queue_to_send_media_sessions)
             sendMediaSessionsToSlaveQueue(queue_to_send_media_sessions)
+            counter += 1
         print "current status of the slaves: "
         print slave_status_dictionary
-        #print "master is going to sleep for 5 seconds"
+        print "master is going to sleep for 10 seconds"
         time.sleep(10)
     return
         

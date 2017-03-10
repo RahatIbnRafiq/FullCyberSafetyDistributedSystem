@@ -1,6 +1,13 @@
 import pika
 import time
 import sys
+import threading
+from Utility.SlaveMediaSession import SlaveMediaSession as SlaveMediaSession
+from datetime import datetime
+import os
+import psutil
+
+from IncrementalClassifier import ClassifierWorks as ClassifierWorks
 
 WHAT_SYSTEM_TO_RUN = 0
 DATABASE_NAME = "VineDatabase"
@@ -11,20 +18,56 @@ PASSWORD = "test"
 IP_LOCALHOST = "128.138.244.39"
 STATUS_QUEUE = "status"
 
-N = 100
 
 list_of_monitoring_media_sessions = []
+list_of_new_media_sessions_from_master = []
+total_media_sessions_being_monitored = 0
 
+#list_of_media_sessions_got_from_master = []
+
+lock_media_session_list = threading.Lock()
+
+
+class classifyThread (threading.Thread):
+    def __init__(self, threadID, name):
+        threading.Thread.__init__(self)
+        self.threadID = threadID
+        self.name = name
+    def run(self):
+        while True:
+            global list_of_monitoring_media_sessions
+            global list_of_new_media_sessions_from_master
+            global lock_media_session_list
+            if len(list_of_new_media_sessions_from_master) > 0:
+                #print "classify thread getting the lock"
+                lock_media_session_list.acquire()
+                for new_media_session in list_of_new_media_sessions_from_master:
+                    list_of_monitoring_media_sessions.append(new_media_session)
+                list_of_new_media_sessions_from_master = []
+                lock_media_session_list.release()
+                #print "classify thread released the lock and appended the new media sessions"
+            ClassifierWorks.classifyMediaSessions(list_of_monitoring_media_sessions)
 
 class CountCallback(object):
     def __init__(self, count):
         self.count = count
 
     def __call__(self, ch, method, properties, body):
+        global list_of_monitoring_media_sessions
+        #global list_of_new_media_sessions_from_master
+        #global lock_media_session_list
         tokens = body.split(",")
+        #print "communicator thread getting the lock"
+        #lock_media_session_list.acquire()
         for token in tokens:
-            list_of_monitoring_media_sessions.append(token)
-        print str(len(tokens))+" number of media sessions got by this slave. Added them to the monitoring list"
+            if len(token) > 0:
+                slave_media_session = SlaveMediaSession(token)
+                #list_of_new_media_sessions_from_master.append(slave_media_session)
+                list_of_monitoring_media_sessions.append(slave_media_session)
+        #print str(len(tokens))+" number of media sessions got by this slave. Added them to the monitoring list"
+        
+        #lock_media_session_list.release()
+        #print "communicator thread releasing the lock"
         ch.stop_consuming()
     
 def sendStatusToMaster(slaveid,queue):
@@ -33,8 +76,14 @@ def sendStatusToMaster(slaveid,queue):
     connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
     channel.queue_declare(queue=STATUS_QUEUE)
-    message = str(len(list_of_monitoring_media_sessions))+","+queue+","+slaveid
-    print "Sending status message to the master: "+message
+    global list_of_monitoring_media_sessions
+    #global list_of_new_media_sessions_from_master
+    #global lock_media_session_list
+    #global total_media_sessions_being_monitored
+    process = psutil.Process(os.getpid())
+    mem = process.memory_info()[0] / float(2 ** 20)
+    message = str(mem)+","+queue+","+slaveid
+    #print "Sending status message to the master: "+message
     channel.basic_publish(exchange='',
                       routing_key=STATUS_QUEUE,
                       body=message,
@@ -54,7 +103,7 @@ def getMediaSessionsFromQueue(queue):
     
     media_session_queue = channel.queue_declare(queue=queue) 
     if media_session_queue.method.message_count == 0:
-        print "slave:media session queue is empty. returning"
+        #print "slave:media session queue is empty. returning"
         connection.close()
         return
     callback = CountCallback(media_session_queue.method.message_count)
@@ -65,14 +114,19 @@ def getMediaSessionsFromQueue(queue):
 
 
 def startRunningSlave(slaveid,queue):
+    global list_of_monitoring_media_sessions
+    #thread1 = classifyThread(1, "classify thread")
+    #thread1.start()
     while True:
         print "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
         sendStatusToMaster(slaveid,queue)
         getMediaSessionsFromQueue(queue)
         #print "slave is going to sleep for 5 seconds."
-        time.sleep(5)
-        
-    return  
+        #time.sleep(5)
+        ClassifierWorks.classifyMediaSessions(list_of_monitoring_media_sessions)
+        print str(len(list_of_monitoring_media_sessions))+" number of media sessions currently being monitored by this slave"
+    #thread1.join()
+      
 
 
 

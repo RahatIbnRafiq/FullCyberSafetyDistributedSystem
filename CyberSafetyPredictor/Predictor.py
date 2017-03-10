@@ -19,7 +19,11 @@ class CyberSafetyPredcitor:
     
     def __init__(self):
         self.rootPath = "C:\\Users\\RahatIbnRafiq\\workspace\\CyberSafetySystem\\"
-        self.predictor = self.LoadPredictor()
+        #self.predictor = self.LoadPredictor()
+        self.theta = array([-7.55733918e-01,1.57389476e-01,-2.14181572e-04])
+        self.intercept = array([0.5678278])
+        
+        
         
     def getPriorityLabels(self,tag,confidence):
         if tag == "bullying":
@@ -49,7 +53,8 @@ class CyberSafetyPredcitor:
     def startPrediction(self,mediaSession):
         featureDictionary =  self.FeatureExtractionPrediction(mediaSession)
         X= self.TransformIntoVectorsPrediction([featureDictionary])
-        return self.predictor.predict(X)[0]
+        h = X.dot(self.theta.T)+self.intercept
+        return 1 if h < 0 else 2
         
     
     def FeatureExtraction(self,data):

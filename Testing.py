@@ -1,34 +1,41 @@
 
+#import sys
+#from CyberSafetyPredictor.Predictor import CyberSafetyPredcitor as CyberSafetyPredictor
+#import pika
+#import time
+import databaseCodes.mongoOperations as mo
+#from Utility.mediaSession import MediaSession as MediaSession
+from datetime import datetime
+import time
+
+import os
+import psutil
 # this file is for testing different codes
 
-import databaseCodes.mongoOperations as mo
-from Utility.mediaSession import MediaSession as MediaSession
+#import databaseCodes.mongoOperations as mo
+#from Utility.mediaSession import MediaSession as MediaSession
+
+#from CyberSafetyPredictor.Predictor import CyberSafetyPredcitor as CyberSafetyPredictor
+"""
+
+
+l
+DATABASE_NAME = "VineDatabase"
+POST_COLLECTION_NAME = "SampledASONAMPosts"
+
+cybersafety_predictor = CyberSafetyPredictor()
+
+slave_status_dictionary = {}
+
+list_of_posts_to_be_predicted = []
+
+
+
+
 
 
 databaseName = "VineDatabase"
 
-
-
-#getting post data from VineDatabase's collection
-
-"""postData = mo.findAllDataFromCollection("VineDatabase", "SampledASONAMPosts")
-count = 0
-for data in postData:
-    try:
-        count +=1
-    except Exception:
-        continue
-    
-print count  """
-
-
-
-
-
-
-# checking if predictor is working
-
-from CyberSafetyPredictor.Predictor import CyberSafetyPredcitor as CyberSafetyPredictor
 
 
 def predictorTesting():
@@ -55,7 +62,7 @@ def predictorTesting():
 
 
 def convertDateToMilliseconds(date):
-    from datetime import datetime
+    
     epoch = datetime.utcfromtimestamp(0)
     date_format = "%Y-%m-%dT%H:%M:%S.%f"
     date = datetime.strptime( date, date_format)
@@ -89,6 +96,45 @@ def getComputerStatistics():
     for process in processes:
         print process.name,process.memory_info()[0]/(1024.0*1024.0)
         
+
+
+def cyberSafetyPredictorWorks():
+    for post_to_be_predicted in list_of_posts_to_be_predicted:
+        post_to_be_predicted.priority =  cybersafety_predictor.startPrediction(post_to_be_predicted)
+        print post_to_be_predicted.priority
+    return
+
+
+def loadingMediaSessions():
+    
+    postData = mo.findAllDataFromCollection(DATABASE_NAME, POST_COLLECTION_NAME)
+    for data in postData:
+        try:
+            list_of_posts_to_be_predicted.append(MediaSession(data["postId"],data["description"],data["likeCount"]))
+        except Exception:
+            continue
+
+
+"""
+
+"""def checkingTimeDifferenceCode():
+    epoch = datetime.utcfromtimestamp(0)
+    now = datetime.now()
+    return (now - epoch).total_seconds() """
+
+
+
+"""def checkcommentIntervalCode():  
+    comments = mo.findCommentsFromVineSlaveComments("VineDatabase", "VineCommentsForSlaves",  "1156467652974342144", 0, 100)  
+    for comment in comments:
+        print comment["commentText"].encode("utf-8")"""
+        
 if __name__ == "__main__":
-    getComputerStatistics()
+    
+    while True:
+        process = psutil.Process(os.getpid())
+        mem = process.memory_info()[0] / float(2 ** 20)
+        print mem
+        time.sleep(10)
     print "done"
+
